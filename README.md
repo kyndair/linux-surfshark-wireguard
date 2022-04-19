@@ -28,7 +28,7 @@ To use this file:
 | generic-bo-001-sre-virtual.conf | General Rotating Pool IP | Bolivia | 1 | Sucre | - | Virtual |
 | generic-de-014-fra-p2p.conf | General Rotating Pool IP |Germany |14 | Frankfurt | - | p2p |
 | generic-se-013-sto.conf | General Rotating Pool IP | Sweden | 13 | Stockholm | - | - |
-| static-uk-063-lon-st005-p2p.conf | Static Shared IP | United Kingdoms of Great Britain and Northern Ireland | 63 | London | st005 | p2p |
+| static-uk-063-lon-st005-p2p.conf | Static Shared IP | United Kingdom of Great Britain and Northern Ireland | 63 | London | st005 | p2p |
 
 ## usage
 
