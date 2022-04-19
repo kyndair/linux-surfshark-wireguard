@@ -16,13 +16,19 @@ To use this file:
 3. The required files will be generated and then using wg-quick your preferred surfshark vpn server can be used.
 
 
-The server configuration files are named in the following way:
+## The server configuration files are named in the following way:
 1. Server type, this can be generic (ordinary server suitable for most people), static, obfuscated & double.
 2. Server country in ISO 2 digit format e.g. de for germany, us for united states of america
 3. Server load, this indicates how busy the server is. In general using the closest is preferable but if another server that is further away is under a much lighter load it is usually best to use the less used server.
 4. Server city, this is a 3 letter city code, if a city has more than one server additional identifying information is given.
 5. Server tags. Unless tagged virtual the servers are physical. The other tag used is P2P indicating servers that fully support P2P usage.
-examples of server names:- generic-ad-004-leu-virtual.conf generic-de-014-fra-p2p.conf generic-se-013-sto.conf static-uk-063-lon-st005-p2p.conf
+
+| Examples of Server Names | Type | Country | Load | City | Additional City | Tags |
+| ----- | ----- | ----- | :---: | ----- | :---: | :---: |
+| generic-bo-001-sre-virtual.conf | General Rotating Pool IP | Bolivia | 1 | Sucre | - | Virtual |
+| generic-de-014-fra-p2p.conf | General Rotating Pool IP |Germany |14 | Frankfurt | - | p2p |
+| generic-se-013-sto.conf | General Rotating Pool IP | Sweden | 13 | Stockholm | - | - |
+| static-uk-063-lon-st005-p2p.conf | Static Shared IP | United Kingdoms of Great Britain and Northern Ireland | 63 | London | st005 | p2p |
 
 ## usage
 
