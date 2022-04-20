@@ -31,7 +31,7 @@ read_config() {
 }
 
 parse_arg() {
-    while getopts 'hdgnrsuZ' opt; do
+    while getopts 'hcdgnrsuZ' opt; do
         case "$opt" in
             Z)  reset_all=1         ;;
             c)  check_status=1      ;;
