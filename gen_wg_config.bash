@@ -302,7 +302,7 @@ gen_client_confs() {
             else
 				file_name=${server}-${file_name}-${srv_tags}
 			fi
-			srv_conf_file=${config_folder}/conf${file_name}.conf
+			srv_conf_file=${config_folder}/conf/${file_name}.conf
 
             srv_conf="[Interface]\nPrivateKey=$(eval echo $(jq '.prv' $wg_keys))\nAddress=10.14.0.2/8\n\n[Peer]\nPublicKey=o07k/2dsaQkLLSR0dCI/FUd3FLik/F/HBBcOGUkNQGo=\nAllowedIPs=172.16.0.36/32\nEndpoint=wgs.prod.surfshark.com:51820\nPersistentKeepalive=25\n\n[Peer]\nPublicKey=${srv_pub}\nAllowedIPs=0.0.0.0/0\nEndpoint=${srv_host}:51820\nPersistentKeepalive=25\n"
             echo -e "$srv_conf" > $srv_conf_file
