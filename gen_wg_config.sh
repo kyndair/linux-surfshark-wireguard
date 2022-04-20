@@ -72,7 +72,8 @@ wg_login() { # login and recieve jwt token and renewal token
         echo "Login "$url $http_status
         echo "Login "$url $http_status $(cat $tmpfile) >> $sswg_log
     done
-    cp -f $tmpfile $token_file
+    rm -f $token_file
+    echo $(cat $tmpfile | jq '.') >> $token_file
     rm $tmpfile
 }
 
@@ -80,7 +81,8 @@ wg_gen_keys() { # generate priavte/public key pair
     echo "generating new keys"
     wg_prv=$(wg genkey)
     wg_pub=$(echo $wg_prv | wg pubkey)
-    echo "{\"pub\":\"$wg_pub\", \"prv\":\"$wg_prv\"}" > $wg_keys
+    rm -f $wg_keys
+    echo -e "{\n\t\"pub\":\"$wg_pub\",\n\t\"prv\":\"$wg_prv\"\n}" > $wg_keys
 }
 
 wg_register_pub() { # check to see if the public key has been registered and/or there is an unexpired token & run appropriate modules
@@ -104,7 +106,7 @@ wg_register_pub() { # check to see if the public key has been registered and/or 
 wg_user_status() { # get current status of user
     url=$baseurl_1/v1/server/user
     token="Authorization: Bearer $(eval echo $(jq '.token' $token_file))"
-    user_status=$(curl -H "${token}" -H "Content-Type: application/json" ${url})
+    user_status=$(curl -H "${token}" -H "Content-Type: application/json" ${url} | jq '.')
     echo "User Status "$url $user_status >> $sswg_log
     if [ $(echo $user_status | jq '.secured') ]; then
         echo "surfshark wireguard is currently on and your IP info is "$(echo $user_status | jq '.ip, .city, .country')
@@ -122,7 +124,7 @@ wg_reg_pubkey() { # register the public key using the jwt token
         url=$(eval echo \${$baseurl})/v1/account/users/public-keys
         data='{"pubKey":'$(jq '.pub' $wg_keys)'}'
         token="Authorization: Bearer $(eval echo $(jq '.token' $token_file))"
-        key_reg=$(curl -H "${token}" -H "Content-Type: application/json" -d "${data}" -X POST ${url})
+        key_reg=$(curl -H "${token}" -H "Content-Type: application/json" -d "${data}" -X POST ${url} | jq '.')
         echo "Registration "$url $key_reg
         echo "Registration "$url $key_reg >> $sswg_log
         let basen=$basen+2
@@ -151,11 +153,8 @@ wg_reg_pubkey() { # register the public key using the jwt token
             fi
         fi
     done
-    if [ -f $token_expires ]; then
-    echo "${key_ren}" > $token_expires
-    else
-    echo "${key_ren}" >> $token_expires
-    fi
+    rm -f $token_expires
+    echo "${key_reg}" >> $token_expires
     echo "token requires renewing prior to "$(eval echo $(jq '.expiresAt' $token_expires))
 }
 
@@ -177,7 +176,7 @@ wg_check_pubkey() { # validates the public key registration process and confirms
         token="Authorization: Bearer $(eval echo $(jq '.token' $token_file))"
         http_status=$(curl -o $tmpfile -w "%{http_code}" -H "${token}" -H "Content-Type: application/json" -d "${data}" -X POST ${url})
         echo "Validation "$url $http_status
-        echo "Validation "$url $http_status $(cat $tmpfile) >> $sswg_log
+        echo "Validation "$url $http_status $(cat $tmpfile | jq '.') >> $sswg_log
         let basen=$basen+2
     done
     if [ $(eval echo $(jq '.expiresAt' $tmpfile)) = $(eval echo $(jq '.expiresAt' $token_expires)) ]; then
@@ -201,7 +200,7 @@ wg_token_renwal() { # use renewal token to generate new tokens
         url=$(eval echo \${$baseurl})/v1/auth/renew
         data='{"pubKey":'$(jq '.pub' $wg_keys)'}'
         token="Authorization: Bearer $(eval echo $(jq '.renewToken' $token_file))"
-        key_ren=$(curl -H "${token}" -H "Content-Type: application/json" -d "${data}" -X POST ${url})
+        key_ren=$(curl -H "${token}" -H "Content-Type: application/json" -d "${data}" -X POST ${url} | jq '.')
         echo "Renewal "$url $key_ren
         echo "Renewal "$url $key_ren >> $sswg_log
         let basen=$basen+2
@@ -257,7 +256,8 @@ get_servers() {
         done
         server_file="$server""_servers_file"
         server_file=$(eval echo \${$server_file})
-        cat $tmpfile > $server_file
+        rm -f $server_file
+        echo $(cat $tmpfile | jq '.') >> $server_file
         rm $tmpfile
     done
 }
@@ -297,7 +297,7 @@ gen_client_confs() {
             else
 				file_name=${server}-${file_name}-${srv_tags}
 			fi
-            echo "{\"description\":\"${srv_host%$postf}\",\"public_key\":\"$srv_pub\",\"endpoint_host\":\"$srv_host\"}" >> ${config_folder}/conf/${file_name}.conf
+            echo -e "{\n\t\"description\":\"${srv_host%$postf}\",\n\t\"public_key\":\"$srv_pub\",\n\t\"endpoint_host\":\"$srv_host\"\n}" >> ${config_folder}/conf/${file_name}.conf
         done
         file_removal="$server""_servers_file"
         file_removal=$(eval echo \${$file_removal})
