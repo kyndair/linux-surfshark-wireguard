@@ -31,7 +31,7 @@ read_config() {
 }
 
 parse_arg() {
-    while getopts 'hdgnrsuZ' opt; do
+    while getopts 'hcdgnrsuZ' opt; do
         case "$opt" in
             Z)  reset_all=1         ;;
             c)  check_status=1      ;;
@@ -69,15 +69,15 @@ wg_login() { # login and recieve jwt token and renewal token
         if [ $basen -gt $urlcount ]; then
             echo "Unable to login, check your credentials."
             rm $tmpfile
-            exit 2
+            exit 100
         fi
         url=$(eval echo \${$baseurl})/v1/auth/login
         data='{"username":"'${username}'","password":"'${password}'"}'
         http_status=$(curl -o $tmpfile -w "%{http_code}" -d "$data" -H 'Content-Type: application/json' -X POST $url)
         echo "Login "$url $http_status
-        echo "Login "$url $http_status $(cat $tmpfile) >> $sswg_log
+        echo "[$(date -Iseconds)] Login "$url $http_status $(cat $tmpfile) >> $sswg_log
     done
-    rm - f $token_file
+    rm -f $token_file
     echo $(cat $tmpfile | jq '.') >> $token_file
     rm $tmpfile
 }
@@ -112,7 +112,7 @@ wg_user_status() { # get current status of user
     url=$baseurl_1/v1/server/user
     token="Authorization: Bearer $(eval echo $(jq '.token' $token_file))"
     user_status=$(curl -H "${token}" -H "Content-Type: application/json" ${url} | jq '.')
-    echo "User Status "$url $user_status >> $sswg_log
+    echo "[$(date -Iseconds)] User Status "$url $user_status >> $sswg_log
     if [ $(echo $user_status | jq '.secured') ]; then
         echo "surfshark wireguard is currently on and your IP info is "$(echo $user_status | jq '.ip, .city, .country')
     else
@@ -131,13 +131,13 @@ wg_reg_pubkey() { # register the public key using the jwt token
         token="Authorization: Bearer $(eval echo $(jq '.token' $token_file))"
         key_reg=$(curl -H "${token}" -H "Content-Type: application/json" -d "${data}" -X POST ${url} | jq '.')
         echo "Registration "$url $key_reg
-        echo "Registration "$url $key_reg >> $sswg_log
+        echo "[$(date -Iseconds)] Registration "$url $key_reg >> $sswg_log
         let basen=$basen+2
-        if [ -n "${key_reg##*expiresAt*}" ] && [ $basen -gt $apiurls ]; then
+        if [ -n "${key_reg##*expiresAt*}" ] && [ $basen -gt $urlcount ]; then
             if [ -z "${key_reg##*400*}" ]; then
                 if [ -z "${key_reg##*Bad Request*}" ]; then
                     echo "Curl post appears to be malformed"
-                    exit 2
+                    exit 110
                 fi
             elif [ -z "${key_reg##*401*}" ]; then
                 if [ -z "${key_reg##*Expired*}" ] && [ $error_count -eq 0 ]; then
@@ -146,15 +146,15 @@ wg_reg_pubkey() { # register the public key using the jwt token
                     basen=1
                 elif [ -z "${key_reg##*Expired*}" ] && [ $error_count -eq 1 ]; then
                     echo "Token is expiring immediately."
-                    exit 2
+                    exit 111
                 elif [ -z "${key_reg##*Token not found*}" ]; then
                     echo "Token was not recognised as a token."
                     echo "If it fails repeatedly check your credentials and that a token exists."
-                    exit 2
+                    exit 112
                 fi
             else
                 echo "Unknown error"
-                exit 2
+                exit 113
             fi
         fi
     done
@@ -174,17 +174,17 @@ wg_check_pubkey() { # validates the public key registration process and confirms
             echo "If it fails repeatedly check your credentials and that key registration has completed."
             echo $(cat $tmpfile)
             rm $tmpfile
-            exit 2
+            exit 120
         fi
         url=$(eval echo \${$baseurl})/v1/account/users/public-keys/validate
         data='{"pubKey":'$(jq '.pub' $wg_keys)'}'
         token="Authorization: Bearer $(eval echo $(jq '.token' $token_file))"
         http_status=$(curl -o $tmpfile -w "%{http_code}" -H "${token}" -H "Content-Type: application/json" -d "${data}" -X POST ${url})
         echo "Validation "$url $http_status
-        echo "Validation "$url $http_status $(cat $tmpfile | jq '.') >> $sswg_log
+        echo "[$(date -Iseconds)] Validation "$url $http_status $(cat $tmpfile) >> $sswg_log
         let basen=$basen+2
     done
-    if [ $(eval echo $(jq '.expiresAt' $tmpfile)) = $(eval echo $(jq '.expiresAt' $token_expires)) ]; then
+    if [ $(eval echo $(jq '.expiresAt' $tmpfile)) != $(eval echo $(jq '.expiresAt' $token_expires)) ]; then
         expire_date=$(eval echo $(jq '.expiresAt' $tmpfile))
         now=$(date -Iseconds -u)
         if [ "${now}" '<' "${expire_date}" ]; then
@@ -207,13 +207,13 @@ wg_token_renwal() { # use renewal token to generate new tokens
         token="Authorization: Bearer $(eval echo $(jq '.renewToken' $token_file))"
         key_ren=$(curl -H "${token}" -H "Content-Type: application/json" -d "${data}" -X POST ${url} | jq '.')
         echo "Renewal "$url $key_ren
-        echo "Renewal "$url $key_ren >> $sswg_log
+        echo "[$(date -Iseconds)] Renewal "$url $key_ren >> $sswg_log
         let basen=$basen+2
-        if [ -n "${key_ren##*renewToken*}" ] && [ $basen -gt $apiurls ]; then
+        if [ -n "${key_ren##*renewToken*}" ] && [ $basen -gt $urlcount ]; then
             if [ -z "${key_ren##*400*}" ]; then
                 if [ -z "${key_ren##*Bad Request*}" ]; then
                     echo "Curl post appears to be malformed"
-                    exit 2
+                    exit 130
                 fi
             elif [ -z "${key_ren##*401*}" ]; then
                 if [ -z "${key_ren##*Expired*}" ] && [ $error_count -eq 0 ]; then
@@ -224,15 +224,15 @@ wg_token_renwal() { # use renewal token to generate new tokens
                     basen=1
                 elif [ -z "${key_ren##*Expired*}" ] && [ $error_count -eq 1 ]; then
                     echo "Token is expiring immediately."
-                    exit 2
+                    exit 131
                 elif [ -z "${key_ren##*Token not found*}" ]; then
                     echo "Token was not recognised as a token."
                     echo "If it fails repeatedly check your credentials and that a token exists."
-                    exit 2
+                    exit 132
                 fi
             else
                 echo "Unknown error"
-                exit 2
+                exit 133
             fi
         fi
     done
@@ -251,13 +251,13 @@ get_servers() {
             if [ $basen -gt $urlcount ]; then
                 echo "Unable to download server information."
                 rm $tmpfile
-                exit 2
+                exit 140
             fi
             url=$(eval echo \${$baseurl})/v4/server/clusters/$server?countryCode=
             token="Authorization: Bearer $(eval echo $(jq '.token' $token_file))"
             http_status=$(curl -o $tmpfile -w "%{http_code}" -H "${token}" -H "Content-Type: application/json" ${url})
             echo $server" servers "$url $http_status
-            echo $server" servers "$url $(cat $http_status | jq '.') >> $sswg_log
+            echo [$(date -Iseconds)] $server" servers "$url $http_status >> $sswg_log
         done
         server_file="$server""_servers_file"
         server_file=$(eval echo \${$server_file})
@@ -301,10 +301,10 @@ gen_client_confs() {
 				file_name=${server}-${file_name}
             else
 				file_name=${server}-${file_name}-${srv_tags}
-			fi
-			srv_conf_file=${config_folder}/conf${file_name}.conf
+            fi
+            srv_conf_file=${config_folder}/conf/${file_name}.conf
 
-            srv_conf="[Interface]\nPrivateKey=$(eval echo $(jq '.prv' $wg_keys))\nAddress=10.14.0.2/8\n\n[Peer]\nPublicKey=o07k/2dsaQkLLSR0dCI/FUd3FLik/F/HBBcOGUkNQGo=\nAllowedIPs=172.16.0.36/32\nEndpoint=wgs.prod.surfshark.com:51820\nPersistentKeepalive=25\n\n[Peer]\nPublicKey=${srv_pub}\nAllowedIPs=0.0.0.0/0\nEndpoint=${srv_host}:51820\nPersistentKeepalive=25\n"
+            srv_conf="[Interface]\nPrivateKey=$(eval echo $(jq '.prv' $wg_keys))\nAddress=10.14.0.2/8\n\n[Peer]\nPublicKey=o07k/2dsaQkLLSR0dCI/FUd3FLik/F/HBBcOGUkNQGo=\nAllowedIPs=172.16.0.36/32\nEndpoint=wgs.prod.surfshark.com:51820\nPersistentKeepalive=25\n\n[Peer]\nPublicKey=$srv_pub\nAllowedIPs=0.0.0.0/0\nEndpoint=${srv_host}:51820\nPersistentKeepalive=25\n"
             echo -e "$srv_conf" > $srv_conf_file
         done
         file_removal="$server""_servers_file"
@@ -315,26 +315,49 @@ gen_client_confs() {
 
 surfshark_up() {
     if [ -e ${config_folder}/surfshark ]; then
-        surfshark_down
+       wg_conf=$(cat ${config_folder}/surfshark)
+       echo "Bringing up Surfshark: ${wg_conf}"
+       wg-quick up ${config_folder}/conf/${wg_conf}
+    else
+       echo "wireguard not started from this script, please set server using -n option first"
+       exit 150
+    fi
+}
+
+surfshark_down() {
+    if [ -e ${config_folder}/surfshark ]; then
+       wg_conf=$(cat ${config_folder}/surfshark)
+       echo "Bringing down Surfshark: ${wg_conf}"
+       wg-quick down ${config_folder}/conf/${wg_conf}
+    else
+       echo "wireguard not started from this script, please set server using -n option first"
+       exit 151
+    fi
+}
+
+surfshark_switch() {
+    if [ -e ${config_folder}/surfshark ]; then
+      wg_conf=$(cat ${config_folder}/surfshark)
+      echo "Current surfshark server: ${wg_conf}"
+    else
+      wg_conf="None"
     fi
 
     PS3="Please enter your choice: "
     echo "Please select your preferred server."
     configs="$(ls -A ${config_folder}/conf/)"
     select server in ${configs}; do
-        wg-quick up "${config_folder}/conf/${server}"
-        cp -f "${config_folder}/conf/${server}" ${config_folder}/surfshark
-        break
+       echo -e "${server}" > ${config_folder}/surfshark
+       break
     done
-}
 
-surfshark_down() {
-    if [ -e ${config_folder}/surfshark ]; then
-        wg_config=$(cat ${config_folder}/surfshark)
-        wg-quick down "${wg_config}"
-        rm ${config_folder}/surfshark
+    wg_conf=$(cat ${config_folder}/surfshark)
+    if [ -e ${config_folder}/conf/${wg_conf} ]; then
+      echo "New surfshark server: ${wg_conf}"
     else
-        echo "wireguard not started from this script, please clear manually"
+      echo "No valid surfshark config selected. Run with -n option again"
+      rm -f ${config_folder}/surfshark
+      exit 152
     fi
 }
 
@@ -350,6 +373,8 @@ reset_surfshark() {
     rm -f ${config_folder}/token.json
     rm -f ${config_folder}/token_expires.json
     rm -f ${config_folder}/surfshark
+    surfshark_switch
+    surfshark_up
 }
 
 read_config
@@ -357,7 +382,7 @@ parse_arg "$@"
 
 if [ $reset_all -eq 1 ]; then
     reset_surfshark
-    exit 1
+    exit 0
 fi
 
 if [ $generate_servers -eq 1 ]; then
@@ -365,34 +390,34 @@ if [ $generate_servers -eq 1 ]; then
     gen_client_confs
     echo "server list now:"
     echo "$(ls -xA ${config_folder}/conf/)"
-    exit 1
+    exit 0
 fi
 
 if [ $switch_conf -eq 1 ]; then
     surfshark_switch
-    exit 1
+    exit 0
 fi
 
 if [ $check_status -eq 1 ]; then
     wg_user_status
-    exit 1
+    exit 0
 fi
 
 if [ $renew_token -eq 1 ]; then
         wg_token_renwal
         wg_check_pubkey
-    exit 1
+    exit 0
 fi
 
 if [ $wireguard_up -eq 1 ]; then
     wg_register_pub
     surfshark_up
-    exit 1
+    exit 0
 fi
 
 if [ $wireguard_down -eq 1 ]; then
     surfshark_down
-    exit 1
+    exit 0
 fi
 
 echo "Logging in if needed ..."
@@ -402,10 +427,10 @@ else
     wg_login
 fi
 
-echo "Generating keys ..."
+echo "Generating keys if needed..."
 if [ -f "$wg_keys" ]; then
     echo "using existent wg keys"
-else 
+else
     wg_gen_keys
 fi
 
@@ -421,7 +446,47 @@ if [ $generate_conf -eq 1 ]; then
 fi
 
 if [ ! -e ${config_folder}/surfshark ]; then
+    surfshark_switch
     surfshark_up
 fi
 
 echo "Done!"
+
+#############################################################################
+# --------------------
+# TABLE OF ERROR CODES
+# --------------------
+# gen_wgconfig
+# 0 All Good
+#
+# wg_login()
+# 100 "Unable to login, check your credentials."
+#
+# wg_reg_pubkey()
+# 110 "Curl post appears to be malformed"
+# 111 "Token is expiring immediately."
+# 112 "Token was not recognised as a token."
+# 113 "Unknown error"
+#
+# wg_check_pubkey()
+# 120 "Public Key was not validated & authorised, please try again."
+#
+# wg_token_renwal()
+# 130 "Curl post appears to be malformed"
+# 131 "Token is expiring immediately."
+# 132 "Token was not recognised as a token."
+# 133 "Unknown error"
+#
+# get_servers()
+# 140 "Unable to download server information."
+#
+# surfshark_up()
+# 150 "wireguard not started from this script, please set server using -n option first"
+#
+# surfshark_down()
+# 151 "wireguard not started from this script, please set server using -n option first"
+#
+# surfshark_switch()
+# 152 "No valid surfshark config selected. Run with -n option again"
+#
+#############################################################################
